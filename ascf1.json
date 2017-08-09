@@ -9,7 +9,7 @@
     "KeyName" : {
         "Type" : "AWS::EC2::KeyPair::KeyName",
         "ConstraintDescription" : "must be the name of an existing EC2 KeyPair.",
-        "Default": "ec2-prasanth01"
+        "Default": "ec2-s3-rakesh"
       },
     "InstanceSecurityGroup" : {
        "Description" : "Security Group for the instances.",
@@ -21,13 +21,12 @@
       "Default" : "ami-a4c7edb2"
     }
   },
-
   "Resources": {
-    "AutoScalingGroup" : {
+    "asGroup" : {
         "Type" : "AWS::AutoScaling::AutoScalingGroup",
         "Properties" : {
           "AvailabilityZones" : {"Fn::GetAZs" : ""},
-          "LaunchConfigurationName" : { "Ref" : "LaunchConfig" },
+          "LaunchConfigurationName" : { "Ref" : "SimpleLaunchConfig" },
           "MinSize" : "1",
           "MaxSize" : "5",
           "Cooldown" : "300",
@@ -38,7 +37,7 @@
       "Type" : "AWS::AutoScaling::ScalingPolicy",
       "Properties" : {
           "AdjustmentType" : "ChangeInCapacity",
-          "AutoScalingGroupName" : { "Ref" : "AutoScalingGroup" },
+          "AutoScalingGroupName" : { "Ref" : "asGroup" },
           "Cooldown" : "60",
           "ScalingAdjustment" : "1"
         }
@@ -47,40 +46,48 @@
       "Type" : "AWS::AutoScaling::ScalingPolicy",
       "Properties" : {
           "AdjustmentType" : "ChangeInCapacity",
-          "AutoScalingGroupName" : { "Ref" : "AutoScalingGroup" },
+          "AutoScalingGroupName" : { "Ref" : "asGroup" },
           "Cooldown" : "60",
           "ScalingAdjustment" : "-1"
         }
       },
-    "CPUAlarmHigh" : {
-      "Type": "AWS::CloudWatch::Alarm",
-      "Properties": {
-          "AlarmDescription": "Scale-up if CPU > 80% for 2 minutes",
-          "MetricName": "CPUUtilization",
-          "Namespace": "AWS/EC2",
-          "Statistic": "Average",
-          "Period": "120",
-          "EvaluationPeriods": "1",
-          "Threshold": "80",
-          "AlarmActions": [ { "Ref": "ScaleUpPolicy" } ],
-          "ComparisonOperator": "GreaterThanThreshold"
-      }
-    },
+      "CPUAlarmHigh" : {
+        "Type": "AWS::CloudWatch::Alarm",
+        "Properties": {
+            "AlarmDescription": "Scale-up if CPU > 80% for 2 minutes",
+            "EvaluationPeriods": "1",
+            "Statistic": "Average",
+            "MetricName": "CPUUtilization",
+            "Namespace": "AWS/EC2",
+            "Dimensions": [ {
+              "Name": "AutoScalingGroupName",
+              "Value": { "Ref": "asGroup" }
+             } ],
+            "Period": "120",
+            "Threshold": "80",
+            "AlarmActions": [ { "Ref": "ScaleUpPolicy" } ],
+            "ComparisonOperator": "GreaterThanThreshold"
+        }
+      },
     "CPUAlarmLow": {
       "Type": "AWS::CloudWatch::Alarm",
       "Properties": {
           "AlarmDescription": "Scale-down if CPU < 40% for 5 minutes",
+          "EvaluationPeriods": "1",
+          "Statistic": "Average",
           "MetricName": "CPUUtilization",
           "Namespace": "AWS/EC2",
-          "Statistic": "Average",
+          "Dimensions": [ {
+            "Name": "AutoScalingGroupName",
+            "Value": { "Ref": "asGroup" }
+           } ],
           "Period": "300",
-          "EvaluationPeriods": "1",
           "Threshold": "40",
           "AlarmActions": [ { "Ref": "ScaleDownPolicy" } ],
           "ComparisonOperator": "LessThanThreshold"
       }
     },
-    "LaunchConfig" : {
+    "SimpleLaunchConfig" : {
       "Type" : "AWS::AutoScaling::LaunchConfiguration",
       "Properties" : {
           "KeyName" : { "Ref" : "KeyName" },
